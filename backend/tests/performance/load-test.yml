@@ -1,0 +1,387 @@
+config:
+  target: "http://localhost:5000"
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      name: "Warm-up phase"
+    - duration: 120
+      arrivalRate: 20
+      rampTo: 50
+      name: "Ramp-up phase"
+  payload:
+    path: "./users.csv"
+    fields:
+      - "username"
+      - "password"
+  environments:
+    production:
+      target: "https://your-production-url.com"
+      phases:
+        - duration: 60
+          arrivalRate: 5
+          name: "Production warm-up"
+        - duration: 300
+          arrivalRate: 10
+          rampTo: 25
+          name: "Production load test"
+    reporters:
+    - name: "json"
+      filename: "report.json"
+    - name: "html"
+      filename: "report.html"
+
+scenarios:
+  # AUTH ROUTES
+  - name: "Authentication Flow"
+    flow:
+      - post:
+          url: "/api/auth/register"
+          json:
+            name: "Test User"
+            email: "testuser-{{ $randomString(10) }}@example.com"
+            password: "Password123"
+            role: "user"
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            json: "$.token"
+            as: "authToken"
+      - post:
+          url: "/api/auth/logout"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+
+  # ADMIN ROUTES
+  - name: "Admin User Management"
+    weight: 5
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "admin@example.com"
+            password: "adminPassword123"
+          capture:
+            json: "$.token"
+            as: "adminToken"
+      - get:
+          url: "/api/admin/profile"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+      - get:
+          url: "/api/admin/users"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+      - get:
+          url: "/api/admin/users/user123"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+      - put:
+          url: "/api/admin/users/user123"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+          json:
+            name: "Updated User"
+            role: "user"
+      - get:
+          url: "/api/admin/category-limits"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+      - post:
+          url: "/api/admin/category-limit"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+          json:
+            category: "Entertainment"
+            spendingLimit: 200
+
+  # BUDGET ROUTES
+  - name: "Budget Management"
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            json: "$.token"
+            as: "authToken"
+      - post:
+          url: "/api/budgets"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            month: "March 2025"
+            totalBudget: 3000
+            categoryBudgets:
+              - category: "Food"
+                amount: 500
+              - category: "Transport"
+                amount: 200
+              - category: "Entertainment"
+                amount: 300
+      - get:
+          url: "/api/budgets"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - get:
+          url: "/api/budgets/status"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - get:
+          url: "/api/budgets/trends"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - patch:
+          url: "/api/budgets/update-spent"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            transaction:
+              type: "expense"
+              amount: 45.5
+              category: "Food"
+              date: "2025-03-10T00:00:00.000Z"
+      - get:
+          url: "/api/budgets/budget123"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - put:
+          url: "/api/budgets/budget123"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            totalBudget: 3200
+            categoryBudgets:
+              - category: "Food"
+                amount: 600
+      - delete:
+          url: "/api/budgets/oldbudget123"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+            
+  # GOALS ROUTES
+  - name: "Financial Goals Flow"
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            json: "$.token"
+            as: "authToken"
+      - post:
+          url: "/api/goals"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            name: "New Car"
+            targetAmount: 20000
+            deadline: "2026-01-01"
+            autoAllocate: true
+            allocationPercentage: 15
+      - get:
+          url: "/api/goals"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - get:
+          url: "/api/goals/goal123"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - put:
+          url: "/api/goals/goal123"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            targetAmount: 25000
+            allocationPercentage: 20
+      - post:
+          url: "/api/goals/goal123/savings"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            amount: 500
+      - delete:
+          url: "/api/goals/oldgoal123"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+            
+  # NOTIFICATION ROUTES
+  - name: "Notifications Management"
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            json: "$.token"
+            as: "authToken"
+      - get:
+          url: "/api/notifications"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - patch:
+          url: "/api/notifications/notif123/read"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - delete:
+          url: "/api/notifications/notif123"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+            
+  # REPORT ROUTES
+  - name: "Financial Reporting"
+    weight: 3
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            json: "$.token"
+            as: "authToken"
+      - post:
+          url: "/api/reports"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - get:
+          url: "/api/reports"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - get:
+          url: "/api/reports/report123"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+            
+  # TRANSACTION ROUTES
+  - name: "Transactions Flow"
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            json: "$.token"
+            as: "authToken"
+      - post:
+          url: "/api/transactions"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            type: "expense"
+            amount: 89.99
+            category: "Shopping"
+            description: "New clothes"
+            date: "2025-03-09T00:00:00.000Z"
+      - get:
+          url: "/api/transactions"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - get:
+          url: "/api/transactions/trans123"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - put:
+          url: "/api/transactions/trans123"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            amount: 94.99
+            description: "New clothes and accessories"
+      - delete:
+          url: "/api/transactions/oldtrans123"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+            
+  # DASHBOARD ROUTES
+  - name: "Dashboard Views"
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            json: "$.token"
+            as: "authToken"
+      - get:
+          url: "/api/dashboard/user"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+            
+  - name: "Admin Dashboard"
+    weight: 5
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "admin@example.com"
+            password: "adminPassword123"
+          capture:
+            json: "$.token"
+            as: "adminToken"
+      - get:
+          url: "/api/dashboard/admin"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+            
+  # COMBINED USER JOURNEY
+  - name: "Full User Journey"
+    weight: 10
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            json: "$.token"
+            as: "authToken"
+      - get:
+          url: "/api/dashboard/user"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - get:
+          url: "/api/budgets/status"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - get:
+          url: "/api/notifications"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - get:
+          url: "/api/transactions"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - post:
+          url: "/api/transactions"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            type: "expense"
+            amount: 35.75
+            category: "Food"
+            description: "Dinner"
+            date: "2025-03-11T00:00:00.000Z"
+      - get:
+          url: "/api/budgets/status"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - get:
+          url: "/api/goals"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - post:
+          url: "/api/reports"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - get:
+          url: "/api/reports"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
